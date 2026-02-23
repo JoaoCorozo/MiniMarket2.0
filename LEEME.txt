@@ -1,0 +1,85 @@
+╔══════════════════════════════════════════════════════════╗
+║           MINIMARKET PILY — Sistema POS v1.0             ║
+╚══════════════════════════════════════════════════════════╝
+
+═══════════════════════════════
+  ARCHIVOS DE LA CARPETA
+═══════════════════════════════
+
+  📄 INICIAR_MINIMARKET.bat   ← Doble clic para abrir el sistema
+  🐍 servidor.py              ← Servidor (no abrir directamente)
+  🌐 Minimarket_Pily.html     ← Sistema (no abrir directamente)
+  💾 datos.json               ← Base de datos (se crea automático)
+  📖 LEEME.txt                ← Este archivo
+
+═══════════════════════════════
+  CÓMO USAR
+═══════════════════════════════
+
+  1. Doble clic en "INICIAR_MINIMARKET.bat"
+  2. Se abre una ventana negra (el servidor)
+  3. El navegador se abre automáticamente
+  4. Usá el sistema normalmente
+  5. Al terminar, cerrá la ventana negra
+
+  ⚠ NO cierres la ventana negra mientras usás el sistema
+
+═══════════════════════════════
+  REQUISITO ÚNICO
+═══════════════════════════════
+
+  Python 3.x instalado en Windows.
+
+  Si no lo tenés:
+  → https://www.python.org/downloads/
+  → Durante la instalación marcá: "Add Python to PATH" ✓
+
+  Una vez instalado, no necesitás nada más.
+  No requiere internet para funcionar.
+
+═══════════════════════════════
+  BASE DE DATOS
+═══════════════════════════════
+
+  Los datos se guardan en "datos.json" dentro de esta carpeta.
+
+  ✓ Si copiás toda la carpeta a otro PC → los datos van con ella
+  ✓ Si hacés backup de la carpeta → tus datos están seguros
+  ✓ Podés abrir datos.json con el Bloc de Notas para verlos
+
+  Para resetear al estado inicial:
+  → En el sistema, clic en "↺ Resetear datos" (arriba a la derecha)
+  → O borrá el archivo datos.json manualmente
+
+═══════════════════════════════
+  FUNCIONALIDADES
+═══════════════════════════════
+
+  🛒 Nueva Venta
+     · Búsqueda por nombre o código
+     · Carrito con ajuste de cantidades
+     · Productos a granel (precio en el momento)
+     · Efectivo (con vuelto), Transferencia, Tarjeta
+     · Descuento automático de stock
+
+  📦 Inventario
+     · Alta / edición / baja de productos
+     · Stock con alertas visuales ⚠
+     · Categorías con emojis personalizados
+     · Soporte para productos a granel
+
+  📊 Reportes
+     · Filtro por período y fechas específicas
+     · Historial de ventas expandible
+     · Métodos de pago + ventas por hora
+     · Ingresos por categoría con gráfico de barras
+     · Detalle por producto con ranking (útil para
+       saber cuántos cigarrillos vendiste en el día)
+
+═══════════════════════════════
+  SOPORTE TÉCNICO
+═══════════════════════════════
+
+  Sistema desarrollado a medida.
+  Versión 1.0 — 2026
+
