@@ -1,0 +1,15 @@
+# Repositorios y entornos de python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+
+# Directorios de compilacion de PyInstaller
+build/
+dist/
+/MinimarketFinal/
+
+# Archivos de datos (no subir DBs locales por seguridad)
+datos.json
+minimarket.log

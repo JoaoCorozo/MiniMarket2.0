@@ -14,16 +14,51 @@ import webbrowser
 import threading
 import time
 from pathlib import Path
+import subprocess
+import logging
+import traceback
 
 # ── Configuración ──
 PUERTO    = 7734
 HOST      = '127.0.0.1'
 URL_BASE  = f'http://{HOST}:{PUERTO}'
 
-# Directorio donde está este script (portable)
-BASE_DIR  = Path(__file__).parent.resolve()
-DATOS_JSON = BASE_DIR / 'datos.json'
-HTML_FILE  = BASE_DIR / 'Minimarket_Pily.html'
+# Detectar si estamos empaquetados como .exe con PyInstaller
+if getattr(sys, 'frozen', False):
+    # El archivo html estará en la carpeta temporal de PyInstaller
+    BUNDLE_DIR = Path(sys._MEIPASS)
+    # Los datos de usuario se guardarán en la carpeta donde está el .exe real
+    EXE_DIR = Path(sys.executable).parent
+else:
+    BUNDLE_DIR = Path(__file__).parent.resolve()
+    EXE_DIR = BUNDLE_DIR
+
+DATOS_JSON = EXE_DIR / 'datos.json'
+HTML_FILE  = BUNDLE_DIR / 'Minimarket_Pily.html'
+LOG_FILE   = EXE_DIR / 'minimarket.log'
+
+# ── Configurar Logging ──
+logging.basicConfig(
+    filename=LOG_FILE,
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+
+# Redirigir prints normales al log para que no se pierdan al correr sin consola
+class StreamToLogger(object):
+    def __init__(self, logger, level):
+        self.logger = logger
+        self.level = level
+        self.linebuf = ''
+    def write(self, buf):
+        for line in buf.rstrip().splitlines():
+            self.logger.log(self.level, line.rstrip())
+    def flush(self):
+        pass
+
+sys.stdout = StreamToLogger(logging.getLogger('STDOUT'), logging.INFO)
+sys.stderr = StreamToLogger(logging.getLogger('STDERR'), logging.ERROR)
 
 # ── Datos por defecto (primera vez) ──
 DATOS_DEFAULT = {
@@ -36,22 +71,10 @@ DATOS_DEFAULT = {
         {"id":6,"nombre":"Golosinas",       "emoji":"🍫"},
         {"id":7,"nombre":"Cigarrillos",     "emoji":"🚬"}
     ],
-    "productos": [
-        {"id":1, "codigo":"001","nombre":"Coca-Cola 500ml",  "catId":1,"precio":1200,"stock":24,"stockMin":5, "activo":True,"granel":False},
-        {"id":2, "codigo":"002","nombre":"Agua mineral 1.5L","catId":1,"precio":800, "stock":15,"stockMin":10,"activo":True,"granel":False},
-        {"id":3, "codigo":"003","nombre":"Pan marraqueta",   "catId":3,"precio":0,   "stock":0, "stockMin":0, "activo":True,"granel":True},
-        {"id":4, "codigo":"004","nombre":"Leche entera 1L",  "catId":2,"precio":1100,"stock":3, "stockMin":5, "activo":True,"granel":False},
-        {"id":5, "codigo":"005","nombre":"Fideos spaghetti", "catId":4,"precio":900, "stock":20,"stockMin":5, "activo":True,"granel":False},
-        {"id":6, "codigo":"006","nombre":"Aceite 900ml",     "catId":4,"precio":2200,"stock":7, "stockMin":4, "activo":True,"granel":False},
-        {"id":7, "codigo":"007","nombre":"Arroz 1kg",        "catId":4,"precio":1300,"stock":12,"stockMin":6, "activo":True,"granel":False},
-        {"id":8, "codigo":"008","nombre":"Yogur frutado",    "catId":2,"precio":600, "stock":2, "stockMin":5, "activo":True,"granel":False},
-        {"id":9, "codigo":"009","nombre":"Marlboro Rojo",    "catId":7,"precio":3200,"stock":30,"stockMin":5, "activo":True,"granel":False},
-        {"id":10,"codigo":"010","nombre":"Belmont Box",      "catId":7,"precio":2800,"stock":20,"stockMin":5, "activo":True,"granel":False},
-        {"id":11,"codigo":"011","nombre":"Pan a granel",     "catId":3,"precio":0,   "stock":0, "stockMin":0, "activo":True,"granel":True}
-    ],
-    "ventas":      [],
+    "productos":  [],
+    "ventas":     [],
     "nextCatId":   8,
-    "nextProdId":  12,
+    "nextProdId":  1,
     "nextVentaId": 1
 }
 
@@ -143,24 +166,19 @@ class PilyHandler(http.server.BaseHTTPRequestHandler):
             self.send_error(404, 'No encontrado')
 
 
-# ── Abrir navegador después de un momento ──
-def abrir_navegador():
-    time.sleep(1.2)
-    webbrowser.open(URL_BASE)
-
-
 # ── Main ──
 def main():
     print("=" * 50)
-    print("  🍄 MINIMARKET PILY — Sistema POS v1.0")
+    print("  🍄 MINIMARKET PILY — Sistema POS v1.0 (Portable)")
     print("=" * 50)
-    print(f"\n  Directorio: {BASE_DIR}")
-    print(f"  Datos:      {DATOS_JSON.name}")
-    print(f"  Servidor:   {URL_BASE}")
+    print(f"\n  Ejecutable Dir: {EXE_DIR}")
+    print(f"  HTML Dir:       {BUNDLE_DIR}")
+    print(f"  Datos:          {DATOS_JSON.name}")
+    print(f"  Servidor local: {URL_BASE}")
 
     if not HTML_FILE.exists():
         print(f"\n[ERROR] No se encontró Minimarket_Pily.html")
-        print(f"  Asegurate de que esté en: {BASE_DIR}")
+        print(f"  Esperado en: {HTML_FILE}")
         input("\nPresioná Enter para salir...")
         sys.exit(1)
 
@@ -176,26 +194,51 @@ def main():
         print(f"    · {n_prods} productos activos")
         print(f"    · {n_ventas} ventas registradas")
 
-    print(f"\n  Abriendo navegador en {URL_BASE} ...")
-    print("\n  [Dejá esta ventana abierta mientras usás el sistema]")
-    print("  [Cerrala cuando termines o presioná Ctrl+C]\n")
+    print(f"\n  Iniciando aplicación en ventana nativa...")
 
-    threading.Thread(target=abrir_navegador, daemon=True).start()
+    # Función para ejecutar el servidor en un hilo
+    def run_server():
+        try:
+            servidor = http.server.HTTPServer((HOST, PUERTO), PilyHandler)
+            servidor.serve_forever()
+        except OSError as e:
+            if 'Address already in use' in str(e):
+                print(f"\n[AVISO] El puerto {PUERTO} ya está en uso. Conectando al existente...")
+            else:
+                print(f"Error interno del servidor: {e}")
+
+    server_thread = threading.Thread(target=run_server, daemon=True)
+    server_thread.start()
+
+    # Dar un instante para que el servidor levante
+    time.sleep(0.5)
 
     try:
-        servidor = http.server.HTTPServer((HOST, PUERTO), PilyHandler)
-        servidor.serve_forever()
+        # Intenta abrir Microsoft Edge en modo aplicación (ventana nativa sin UI de navegador)
+        edge_paths = [
+            r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+            r"C:\Program Files\Microsoft\Edge\Application\msedge.exe"
+        ]
+        edge_exe = next((p for p in edge_paths if os.path.exists(p)), None)
+        
+        if edge_exe:
+            subprocess.Popen([edge_exe, f'--app={URL_BASE}'])
+        else:
+            # Fallback a navegador por defecto
+            webbrowser.open(URL_BASE)
+            
+        print("\n  [Dejá esta ventana negra abierta mientras usás el sistema]")
+        print("  [Cerrala cuando termines para apagar el servidor]\n")
+        
+        # Mantener el hilo principal vivo
+        while True:
+            time.sleep(1)
+            
     except KeyboardInterrupt:
         print("\n\n  Sistema cerrado. ¡Hasta luego!")
-    except OSError as e:
-        if 'Address already in use' in str(e):
-            print(f"\n[AVISO] El puerto {PUERTO} ya está en uso.")
-            print(f"  Quizás el sistema ya está corriendo.")
-            print(f"  Abrí tu navegador en: {URL_BASE}")
-            webbrowser.open(URL_BASE)
-            input("\nPresioná Enter para salir...")
-        else:
-            raise
+    except Exception as e:
+        print(f"Error al abrir la ventana: {e}")
+        input("Presione Enter para salir...")
 
 
 if __name__ == '__main__':
